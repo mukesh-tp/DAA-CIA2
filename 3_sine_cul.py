@@ -1,78 +1,72 @@
 import numpy as np
-import random
 import matplotlib.pyplot as plt
 
-# Define the problem
-x_data = np.linspace(-1, 1, 100)
-y_data = x_data * np.sin(10 * np.pi * x_data) + 2
+# Define the fitness function to evaluate the sine wave
+def fitness_function(x):
+    y = np.sin(x)
+    return np.sum(y)
 
-# Define the fitness function
-def fitness(chromosome):
-    y_pred = chromosome[0] * x_data * np.sin(chromosome[1] * np.pi * x_data) + chromosome[2]
-    return np.sum((y_pred - y_data)**2)
+# Define the cultural algorithm parameters
+pop_size = 50  # population size
+num_generations = 100  # number of generations
+mutation_rate = 0.01  # mutation rate
+selection_size = 10  # number of individuals to select for breeding
+cultural_rate = 0.1  # cultural learning rate
+cultural_pool_size = 5  # size of the cultural pool
 
-# Define the chromosome
-chromosome_length = 3
-min_gene = -10
-max_gene = 10
+# Initialize the population with random values in the range [0, 2pi]
+population = np.random.uniform(low=0.0, high=2*np.pi, size=(pop_size,))
 
-# Initialize the population
-population_size = 50
-population = [np.random.uniform(min_gene, max_gene, chromosome_length) for i in range(population_size)]
+# Initialize the cultural pool with the top individuals from the initial population
+fitness = np.array([fitness_function(x) for x in population])
+cultural_pool_indices = np.argsort(fitness)[-cultural_pool_size:]
+cultural_pool = population[cultural_pool_indices]
 
-# Define the genetic operators
-def tournament_selection(population, fitness):
-    tournament_size = 5
-    tournament = random.sample(population, tournament_size)
-    fitnesses = [fitness(chromosome) for chromosome in tournament]
-    return tournament[np.argmin(fitnesses)]
-
-def single_point_crossover(parent1, parent2):
-    crossover_point = random.randint(1, chromosome_length - 1)
-    child1 = np.concatenate((parent1[:crossover_point], parent2[crossover_point:]))
-    child2 = np.concatenate((parent2[:crossover_point], parent1[crossover_point:]))
-    return child1, child2
-
-def gaussian_mutation(chromosome, mutation_rate):
-    for i in range(chromosome_length):
-        if random.random() < mutation_rate:
-            chromosome[i] += np.random.normal(0, 1)
-    return chromosome
-
-# Define the genetic algorithm parameters
-num_generations = 100
-mutation_rate = 0.1
-
-# Run the genetic algorithm
+# Run the cultural algorithm for the specified number of generations
 for generation in range(num_generations):
-    # Evaluate the fitness of the population
-    fitnesses = [fitness(chromosome) for chromosome in population]
-    best_chromosome = population[np.argmin(fitnesses)]
-    print("Generation:", generation, "Best fitness:", fitness(best_chromosome), "Best chromosome:", best_chromosome)
 
-    # Select parents for reproduction
-    parents = [tournament_selection(population, fitness) for i in range(population_size)]
+    # Evaluate the fitness of each individual in the population
+    fitness = np.array([fitness_function(x) for x in population])
 
-    # Perform crossover and mutation to create offspring
-    offspring = []
-    for i in range(population_size // 2):
-        parent1 = parents[random.randint(0, population_size - 1)]
-        parent2 = parents[random.randint(0, population_size - 1)]
-        child1, child2 = single_point_crossover(parent1, parent2)
-        child1 = gaussian_mutation(child1, mutation_rate)
-        child2 = gaussian_mutation(child2, mutation_rate)
-        offspring.append(child1)
-        offspring.append(child2)
+    # Select the best individuals for breeding
+    selected_indices = np.argsort(fitness)[-selection_size:]
+    selected_population = population[selected_indices]
 
-    # Replace the old population with the new offspring population
+    # Learn from the cultural pool and update the population
+    for i in range(pop_size):
+        if np.random.rand() < cultural_rate:
+            cultural_individual = np.random.choice(cultural_pool)
+            population[i] = cultural_individual
+
+    # Create new offspring by breeding the selected individuals
+    offspring = np.empty((pop_size,))
+    for i in range(pop_size):
+        parent1, parent2 = np.random.choice(selected_population, size=2, replace=False)
+        offspring[i] = np.random.uniform(low=0.0, high=2*np.pi) if np.random.rand() < mutation_rate \
+            else (parent1 + parent2) / 2
+
+    # Replace the old population with the new offspring
     population = offspring
 
-# Generate the curve
-y_curve = best_chromosome[0] * x_data * np.sin(best_chromosome[1] * np.pi * x_data) + best_chromosome[2]
-print("Best curve:", y_curve)
+    # Update the cultural pool with the best individuals from the current population
+    fitness = np.array([fitness_function(x) for x in population])
+    cultural_pool_indices = np.argsort(fitness)[-cultural_pool_size:]
+    cultural_pool = population[cultural_pool_indices]
 
-# Plot the data points and the curve
-plt.plot(x_data, y_data, label = 'actual')
-plt.plot(x_data, y_curve, label = 'predicted')
+# Select the best individual from the final population
+fitness = np.array([fitness_function(x) for x in population])
+best_index = np.argmax(fitness)
+best_individual = population[best_index]
+best_fitness = fitness[best_index]
+
+# Plot the best individual
+x = np.linspace(0, 2*np.pi, 1000)
+y = np.sin(x)
+plt.plot(x, y, label='True function')
+y = np.sin(best_individual)
+plt.plot(best_individual, y, 'ro', label='Best individual')
 plt.legend()
 plt.show()
+
+print(f'Best individual: {best_individual}')
+print(f'Best fitness: {best_fitness}')
